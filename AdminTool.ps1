@@ -8611,79 +8611,94 @@ function GenerateForm {
         else { $vbmsg1 = $vbmsg.popup("You may only select one at time for password resets.", 0, "Error", 0) }
     } #End function reset password
     
-    ##########################
-    ## Unlocks a Local User ##
-    ##########################
-    $btn26_OnClick = 
-    {
-        [int]$pct = (0 / 3) * 100
-        $progress1.Value = $pct #update the progress bar
-    
-        [System.Windows.Forms.Cursor]::Current = 'WaitCursor'
-        $computername = $txt1.text
-        if (!($list11.selecteditems.count -gt 1)) {
-            if (!($list11.selecteditems.count -lt 1)) {
-                if (!($computername -like "*.*.*.*")) {
-                    $stBar1.text = "Pinging " + $computername.ToUpper()
-                    if (Test-Connection $Computername -quiet -count 1) {
-                        [int]$pct = (1 / 3) * 100
-                        $progress1.Value = $pct #update the progress bar
-    
-                        $exprString2 = '$list11.SelectedItems | foreach-object {$_.tag} | foreach-object {$_.User}'
-                        $user = invoke-expression $exprString2
-                        $username = $user.Trim()
-    
-                        [System.Windows.Forms.Cursor]::Current = 'WaitCursor'
-                        $stBar1.text = "Loading " + $username + "'s settings on " + $computername + "..."
-    
-                        [int]$pct = (2 / 3) * 100
-                        $progress1.Value = $pct #update the progress bar
-    
-                        If ($null -ne $username) {
-                            $stBar1.text = "Enabling user " + $username + " on " + $computername.ToUpper()
-                            Invoke-Command -ComputerName $computername -ArgumentList $username -ScriptBlock { Param($username); Enable-LocalUser -Name $username }
-                            if ($? -eq $True) {
-                                $stBar1.text = "User " + $username + " is now enabled..."
-                                [int]$pct = (3 / 3) * 100
-                                $progress1.Value = $pct #update the progress bar
+# This script is part of a GUI application that enables a user to enable a local account on a remote computer.
+# The script is triggered when the user clicks a button in the GUI.
+
+# The $btn26_OnClick variable holds the script block that will be executed when the button is clicked
+$btn26_OnClick = 
+{
+    # Set the progress bar value to 0
+    $progress1.Value = 0 
+
+    # Change the cursor to a wait cursor to indicate that the script is working
+    [System.Windows.Forms.Cursor]::Current = 'WaitCursor'
+
+    # Get the computer name from the textbox in the GUI
+    $computername = $txt1.text
+
+    # Check if the computer name entered is an IP address
+    if (!($computername -like "*.*.*.*")) {
+        # Update the status bar text to indicate that the script is pinging the computer
+        $stBar1.text = "Pinging " + $computername.ToUpper()
+        try{
+            # Test the connection to the remote computer
+            if (Test-Connection $Computername -quiet -count 1 -ErrorAction SilentlyContinue) {
+                # Update the progress bar value to 33.33%
+                $progress1.Value = 33.33 
+
+                # Get the selected user from the listbox in the GUI
+                $user = ($list11.SelectedItems | foreach-object {$_.tag} | foreach-object {$_.User}).Trim()
+
+                # Change the cursor to a wait cursor to indicate that the script is working
+                [System.Windows.Forms.Cursor]::Current = 'WaitCursor'
+                # Update the status bar text to indicate that the script is loading the user's settings
+                $stBar1.text = "Loading " + $user + "'s settings on " + $computername + "..."
+
+                # Update the progress bar value to 66.66%
+                $progress1.Value = 66.66 
+
+                # Check if the selected user is not null
+                If ($null -ne $user) {
+                    # Update the status bar text to indicate that the script is enabling the user
+                    $stBar1.text = "Enabling user " + $user + " on " + $computername.ToUpper()
+                    # Enable the local user on the remote computer
+                    Invoke-Command -ComputerName $computername -ArgumentList $user -ScriptBlock { Param($user); Enable-LocalUser -Name $user } -ErrorAction SilentlyContinue
+                    # Update the status bar text to indicate that the user has been enabled
+                    $stBar1.text = "User " + $user + " is now enabled..."
+                    # Update the progress bar value to 100%
+                    $progress1.Value = 100 
+                }
+                else {
+                    # Update the status bar text to indicate that the user was not found
+                    $stBar1.text = "Error: unable to find user " + $user
+                    $progress1.Value = 100 
+                }
+                                # check if the log file exists
+                                if (test-path $lfile) { 
+                                    # write the log entry
+                                    (get-date -uformat "%Y-%m-%d-%H:%M") + ": " + $user + " - " + "Enabled local account " + $user + " on " + $computername | out-file -filepath $lfile -append 
+                                }
+                                else {
+                                    # create the log file if it does not exist
+                                    New-Item "$env:SystemDrive\Admin_Tool\Task_Logs\logs.log" -ItemType File -Force
+                                    "`t`t`t`t Task Logs Performed by Admin_Tool `n`n" | out-file -filepath $lfile
+                                }
                             }
                             else {
-                                $stBar1.text = "Error: issue enableing user " + $username
-                                [int]$pct = (3 / 3) * 100
-                                $progress1.Value = $pct #update the progress bar
+                                # Update the status bar text to indicate that the script could not contact the remote computer
+                                $stBar1.text = "Could not contact " + $computername.ToUpper()
+                                # Update the progress bar value to 100%
+                                $progress1.Value = 100 
                             }
-                        }
-                        Else {
-                            $stBar1.text = "Error: unable to find user " + $username
-                            [int]$pct = (3 / 3) * 100
-                            $progress1.Value = $pct #update the progress bar
-                        }
-                        if (test-path $lfile) { (get-date -uformat "%Y-%m-%d-%H:%M") + ": " + $user + " - " + "Enabled local account " + $username + " on " + $computername | out-file -filepath $lfile -append }
-                        Else {
-                            New-Item "$env:SystemDrive\Admin_Tool\Task_Logs\logs.log" -ItemType File -Force
-                            "`t`t`t`t Task Logs Performed by Admin_Tool `n`n" | out-file -filepath $lfile
+                        } catch {
+                            # Update the status bar text to indicate that there was an error enabling the user
+                            $stBar1.text = "Error: issue enableing user " + $user
+                            # Update the progress bar value to 100%
+                            $progress1.Value = 100 
                         }
                     }
                     else {
-                        $stBar1.text = "Could not contact " + $computername.ToUpper()
-                        [int]$pct = (3 / 3) * 100
-                        $progress1.Value = $pct #update the progress bar
+                        # Update the GUI to indicate that the user entered an IP address
+                        $lbl2.visible = $true
+                        $list1.visible = $false
+                        $lbl2.text = ""
+                        $stBar1.text = "Enter a computer name. No IP addresses."
+                        $lbl2.text += "`n`n`n`n`n`n`n`n`n`n`n`n`n`n`t`t`t`t`t Enter a computer name. No IP addresses."
+                        # Update the progress bar value to 100%
+                        $progress1.Value = 100 
                     }
-                }
-                Else {
-                    $lbl2.visible = $true
-                    $list1.visible = $false
-                    $lbl2.text = ""
-                    $stBar1.text = "Enter a computer name. No IP addresses."
-                    $lbl2.text += "`n`n`n`n`n`n`n`n`n`n`n`n`n`n`t`t`t`t`t Enter a computer name. No IP addresses."
-                    [int]$pct = (3 / 3) * 100
-                    $progress1.Value = $pct #update the progress bar
-                }
-            }
-            else { $vbmsg1 = $vbmsg.popup("Please select a profile to enable.", 0, "Error", 0) }
-        }
-        else { $vbmsg1 = $vbmsg.popup("You may only select one to enable at a time.", 0, "Error", 0) }
-    } #End function enable user
+                } # END function Enable-LocalUser
+                
     
     ############################
     ## Update McAfee Dat File ##
@@ -10266,14 +10281,26 @@ $vbmsg = new-object -comobject wscript.shell
     
 # Checks to see if RSAT is installed and imports the module
 Function ADImport {
-    if (Get-Module -list ActiveDirectory) { Import-Module ActiveDirectory }
-    
-    Elseif (Test-Path "$env:SystemDrive\Admin_Tool\AD_Module" -ErrorAction SilentlyContinue) {
-        Import-Module $env:SystemDrive\Admin_Tool\AD_Module\*.dll
-        Start-Sleep -Milliseconds 600
-        Import-Module $env:SystemDrive\Admin_Tool\AD_Module\ActiveDirectory\*.psd1
+    # Define a variable to store the path of the AD_Module
+    $modulePath = "$env:SystemDrive\Admin_Tool\AD_Module"
+
+    # Check if the ActiveDirectory module is already loaded
+    if (Get-Module -ListActive | Where-Object { $_.Name -eq "ActiveDirectory" }) { 
+        # If the module is already loaded, exit the function
+        return
     }
-    Else {
+    # Check if the AD_Module path exists
+    elsif (Test-Path $modulePath) {
+        # Define the path to the dll and psd1 files
+        $dllPath = Join-Path $modulePath "*.dll"
+        $psd1Path = Join-Path $modulePath "ActiveDirectory\*.psd1"
+        
+        # Import the dll and psd1 files
+        Import-Module $dllPath
+        Start-Sleep -Milliseconds 600
+        Import-Module $psd1Path
+    } else {
+        # If the path does not exist, display an error message
         $vbmsg1 = $vbmsg.popup("The RSAT modules are not installed. You will not be able to perform Active Directory queries. You can get the RSAT install file from the shared drive or Microsoft website (https://www.microsoft.com/en-us/download/details.aspx?id=45520).", 0, "RSAT Check", 0)
     }
 }
