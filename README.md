@@ -35,6 +35,7 @@ PowerShell - The scripting language used
 
 ### Authors
 Diplodongus - Initial work - Diplodongus
+Original Authors: Rich Prescott, Skyler Hunter, Stilianos Daskalakis
 
 ### License
 This project is licensed under the MIT License - see the LICENSE.md file for details
