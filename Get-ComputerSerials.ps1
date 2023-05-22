@@ -23,11 +23,10 @@ if ($saveFileDialog.ShowDialog() -eq 'OK') {
     $csvfile = $saveFileDialog.FileName
 }
 
-# Initialize the results array
-$results = @()
+# Function to process each computer
+function Process-Computer {
+    param($computername)
 
-# Iterate over each computer
-foreach ($computername in $computernames) {
     Write-Output "Processing $computername"
 
     # Initialize a hashtable for the current computer results
@@ -53,9 +52,12 @@ foreach ($computername in $computernames) {
         $result["LoggedUser"] = "Host Offline"
     }
 
-    # Add the current computer results to the results array
-    $results += New-Object psobject -Property $result
+    # Return the results for the current computer
+    return New-Object psobject -Property $result
 }
 
-# Export results to CSV
-$results | Export-Csv $csvfile -NoTypeInformation
+# Process each computer in parallel and write each result to the CSV file as it becomes available
+$computernames | ForEach-Object -Parallel {
+    $result = Process-Computer -computername $_
+    $result | Export-Csv $csvfile -NoTypeInformation -Append
+}
