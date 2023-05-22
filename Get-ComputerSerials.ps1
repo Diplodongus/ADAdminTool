@@ -79,11 +79,10 @@ function Process-Computer {
 # Process each computer in parallel and write each result to the CSV file as it becomes available
 $computernames | ForEach-Object -Parallel {
     $computername = $_
-    $result = & $using:args[0] $computername
+    $result = Process-Computer -computername $computername
     try {
-        $result | Export-Csv $using:args[1] -NoTypeInformation -Append -ErrorAction Stop
+        $result | Export-Csv -Path $using:csvfile -NoTypeInformation -Append -ErrorAction Stop
     } catch {
         Write-Output "Failed to export CSV for $computername. Error: $_"
     }
--ThrottleLimit $computernames.Count -ArgumentList $function:Process-Computer, $csvfile
-
+} -ThrottleLimit $computernames.Count
