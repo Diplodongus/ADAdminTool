@@ -1,3 +1,8 @@
+#####
+# Author: Tanner J. Brouillard
+# Github: https://github.com/Diplodongus/ADAdminTool/edit/main/Get-ComputerSerials.ps1
+# Requires Powershell 7 to function. For version compatible with Powershell 5, see older revisions.
+####
 # Add assembly for OpenFileDialog
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -58,6 +63,6 @@ function Process-Computer {
 
 # Process each computer in parallel and write each result to the CSV file as it becomes available
 $computernames | ForEach-Object -Parallel {
-    $result = Process-Computer -computername $_
-    $result | Export-Csv $csvfile -NoTypeInformation -Append
-}
+    $result = & $using:args[0] $using:args[1]
+    $result | Export-Csv $using:args[2] -NoTypeInformation -Append
+} -ThrottleLimit $computernames.Count -ArgumentList $function:Process-Computer, $_, $csvfile
