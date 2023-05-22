@@ -2,7 +2,7 @@
 # Author: Tanner J. Brouillard
 # Github: https://github.com/Diplodongus/ADAdminTool/edit/main/Get-ComputerSerials.ps1
 # Requires Powershell 7 to function. For version compatible with Powershell 5, see older revisions.
-####
+#####
 # Add assembly for OpenFileDialog
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -38,17 +38,32 @@ function Process-Computer {
     $result = @{"ComputerName"=$computername}
 
     # Test connection
-    if (Test-Connection -ComputerName $computername -Count 1 -Quiet) {
-        # Gather system info using WMI
-        $os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName $computername
-        $cs = Get-WmiObject -Class Win32_ComputerSystem -ComputerName $computername
-        $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $computername
+    try {
+        $online = Test-Connection -ComputerName $computername -Count 1 -Quiet -ErrorAction Stop
+    } catch {
+        Write-Output "Failed to test connection to $computername. Error: $_"
+        $online = $false
+    }
 
-        # Fill in the results hashtable
-        $result["Serial"] = $bios.SerialNumber
-        $result["Model"] = $cs.Model
-        $result["Vendor"] = $cs.Manufacturer
-        $result["LoggedUser"] = $cs.UserName
+    if ($online) {
+        # Gather system info using WMI
+        try {
+            $os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName $computername -ErrorAction Stop
+            $cs = Get-WmiObject -Class Win32_ComputerSystem -ComputerName $computername -ErrorAction Stop
+            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $computername -ErrorAction Stop
+
+            # Fill in the results hashtable
+            $result["Serial"] = $bios.SerialNumber
+            $result["Model"] = $cs.Model
+            $result["Vendor"] = $cs.Manufacturer
+            $result["LoggedUser"] = $cs.UserName
+        } catch {
+            Write-Output "Failed to retrieve WMI information from $computername. Error: $_"
+            $result["Serial"] = "WMI Error"
+            $result["Model"] = "WMI Error"
+            $result["Vendor"] = "WMI Error"
+            $result["LoggedUser"] = "WMI Error"
+        }
     } else {
         # Host offline
         $result["Serial"] = "Host Offline"
@@ -63,6 +78,12 @@ function Process-Computer {
 
 # Process each computer in parallel and write each result to the CSV file as it becomes available
 $computernames | ForEach-Object -Parallel {
-    $result = & $using:args[0] $using:args[1]
-    $result | Export-Csv $using:args[2] -NoTypeInformation -Append
-} -ThrottleLimit $computernames.Count -ArgumentList $function:Process-Computer, $_, $csvfile
+    $computername = $_
+    $result = & $using:args[0] $computername
+    try {
+        $result | Export-Csv $using:args[1] -NoTypeInformation -Append -ErrorAction Stop
+    } catch {
+        Write-Output "Failed to export CSV for $computername. Error: $_"
+    }
+-ThrottleLimit $computernames.Count -ArgumentList $function:Process-Computer, $csvfile
+
