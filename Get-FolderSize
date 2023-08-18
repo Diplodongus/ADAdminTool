@@ -1,9 +1,9 @@
 function Get-FolderSize {
     param (
-        [string]$folderPath
+        [string]$folderPath,
+        [int]$depth
     )
 
-    $subfolders = Get-ChildItem -Path $folderPath -Directory
     $results = @()
 
     function ConvertTo-ReadableSize {
@@ -21,23 +21,35 @@ function Get-FolderSize {
         }
     }
 
-    foreach ($subfolder in $subfolders) {
-        $subfolderSize = (Get-ChildItem -Path $subfolder.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
-        $results += [PSCustomObject]@{
-            'Folder' = $subfolder.FullName
-            'Size' = ConvertTo-ReadableSize -bytes $subfolderSize
-        }
+    function Get-Size {
+        param (
+            [string]$path
+        )
+        (Get-ChildItem -Path $path -File | Measure-Object -Property Length -Sum).Sum
+    }
 
-        $subsubfolders = Get-ChildItem -Path $subfolder.FullName -Directory
-        foreach ($subsubfolder in $subsubfolders) {
-            $subsubfolderSize = (Get-ChildItem -Path $subsubfolder.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
-            $results += [PSCustomObject]@{
-                'Folder' = $subsubfolder.FullName
-                'Size' = ConvertTo-ReadableSize -bytes $subsubfolderSize
-            }
+    function Get-SubfolderSizes {
+        param (
+            [string]$folder,
+            [int]$currentDepth
+        )
+        
+        if ($currentDepth -gt $depth) {
+            return
+        }
+        
+        $folderSize = Get-Size -path $folder
+        $results += [PSCustomObject]@{
+            'Folder' = $folder
+            'Size' = ConvertTo-ReadableSize -bytes $folderSize
+        }
+        
+        foreach ($subfolder in Get-ChildItem -Path $folder -Directory) {
+            Get-SubfolderSizes -folder $subfolder.FullName -currentDepth ($currentDepth + 1)
         }
     }
 
+    Get-SubfolderSizes -folder $folderPath -currentDepth 1
     $results | Format-Table -AutoSize
 }
 
@@ -46,7 +58,7 @@ $folderPath = Read-Host "Please enter the folder path"
 
 # Check if the folder exists
 if (Test-Path -Path $folderPath -PathType Container) {
-    Get-FolderSize -folderPath $folderPath
+    Get-FolderSize -folderPath $folderPath -depth 5
 }
 else {
     Write-Host "The specified folder does not exist."
