@@ -1,0 +1,53 @@
+function Get-FolderSize {
+    param (
+        [string]$folderPath
+    )
+
+    $subfolders = Get-ChildItem -Path $folderPath -Directory
+    $results = @()
+
+    function ConvertTo-ReadableSize {
+        param (
+            [int64]$bytes
+        )
+        if ($bytes -ge 1GB) {
+            "{0:N2} GB" -f ($bytes / 1GB)
+        } elseif ($bytes -ge 1MB) {
+            "{0:N2} MB" -f ($bytes / 1MB)
+        } elseif ($bytes -ge 1KB) {
+            "{0:N2} KB" -f ($bytes / 1KB)
+        } else {
+            "$bytes B"
+        }
+    }
+
+    foreach ($subfolder in $subfolders) {
+        $subfolderSize = (Get-ChildItem -Path $subfolder.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
+        $results += [PSCustomObject]@{
+            'Folder' = $subfolder.FullName
+            'Size' = ConvertTo-ReadableSize -bytes $subfolderSize
+        }
+
+        $subsubfolders = Get-ChildItem -Path $subfolder.FullName -Directory
+        foreach ($subsubfolder in $subsubfolders) {
+            $subsubfolderSize = (Get-ChildItem -Path $subsubfolder.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
+            $results += [PSCustomObject]@{
+                'Folder' = $subsubfolder.FullName
+                'Size' = ConvertTo-ReadableSize -bytes $subsubfolderSize
+            }
+        }
+    }
+
+    $results | Format-Table -AutoSize
+}
+
+# Prompt for folder path
+$folderPath = Read-Host "Please enter the folder path"
+
+# Check if the folder exists
+if (Test-Path -Path $folderPath -PathType Container) {
+    Get-FolderSize -folderPath $folderPath
+}
+else {
+    Write-Host "The specified folder does not exist."
+}
